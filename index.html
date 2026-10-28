@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TXT Audio Reader</title>
+<style>
+  :root {
+    --bg: #f6f3ee; --panel: #fffdf9; --ink: #2a2622; --muted: #7a716a;
+    --line: #e4ddd3; --accent: #c2562b; --accent-ink: #fff; --hl: #f7dccb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1916; --panel: #24211d; --ink: #ece6de; --muted: #9a9087;
+      --line: #3a352f; --accent: #e07a4a; --accent-ink: #1b1916; --hl: #4a3226;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: .01em; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: .95rem; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  label { font-size: .85rem; color: var(--muted); }
+  select, input[type=range] { accent-color: var(--accent); }
+  select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); max-width: 100%; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--bg); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  textarea { width: 100%; min-height: 160px; font: inherit; padding: 12px; border-radius: 10px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+  .drop { outline: 2px dashed var(--accent); outline-offset: 4px; }
+  #docInfo { font-size: .95rem; margin: 0 0 10px; }
+  #docInfo b { font-weight: 600; }
+  #status { font-size: .9rem; color: var(--muted); min-height: 1.4em; margin-top: 10px; }
+  #bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+  #bar div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #reader { max-height: 440px; overflow: auto; }
+  #reader p { margin: 0 0 10px; }
+  #reader span { border-radius: 4px; padding: 1px 2px; cursor: pointer; }
+  #reader span.now { background: var(--hl); }
+  #reader span.done { color: var(--muted); }
+  .hint { font-size: .85rem; color: var(--muted); margin: 8px 0 0; }
+  .spacer { flex: 1; }
+  #chapterRow { margin-top: 12px; }
+  #reader span.marked { text-decoration: underline wavy var(--accent); text-underline-offset: 4px; }
+  .tags button { padding: 6px 12px; font-size: .9rem; }
+  .tags kbd { font: .75rem ui-monospace, monospace; color: var(--muted); margin-left: 4px; }
+  #noteText { flex: 1; min-width: 180px; font: inherit; padding: 7px 10px; border-radius: 8px;
+              border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  #notesList { list-style: none; margin: 14px 0 0; padding: 0; max-height: 300px; overflow: auto; }
+  #notesList li { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); font-size: .92rem; }
+  #notesList .tag { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  #notesList .what { flex: 1; cursor: pointer; }
+  #notesList .what i { color: var(--muted); }
+  #notesList .x { border: 0; background: none; color: var(--muted); padding: 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  #chapter { flex: 1; min-width: 200px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TXT Audio <span>Reader</span></h1>
+  <p class="sub">Paste text, or open / drop a .md, .txt, .epub or .pdf file. Everything runs on this Mac.</p>
+
+  <div class="panel">
+    <div class="row">
+      <label>Voice
+        <select id="voice">
+          <optgroup label="English (British)">
+          <option value="bf_emma">Emma (female)</option>
+          <option value="bf_isabella">Isabella (female)</option>
+          <option value="bf_alice">Alice (female)</option>
+          <option value="bf_lily" selected>Lily (female)</option>
+          <option value="bm_george">George (male)</option>
+          <option value="bm_fable">Fable (male)</option>
+          <option value="bm_lewis">Lewis (male)</option>
+          <option value="bm_daniel">Daniel (male)</option>
+          </optgroup>
+          <optgroup label="Nederlands">
+            <option value="nl_NL-mls-medium">Nederlands (NL)</option>
+            <option value="nl_BE-nathalie-medium">Nathalie (Vlaams)</option>
+            <option value="nl_BE-rdh-medium">RDH (Vlaams)</option>
+          </optgroup>
+        </select>
+      </label>
+      <label title="Speed applies to the English voices">Speed <input id="speed" type="range" min="0.7" max="1.4" step="0.05" value="1"> <span id="speedVal">1.00×</span></label>
+      <span class="spacer"></span>
+      <button id="openBtn">Open file…</button>
+      <input id="file" type="file" accept=".md,.markdown,.txt,.epub,.pdf" hidden>
+    </div>
+  </div>
+
+  <div class="panel" id="dropZone">
+    <p id="docInfo" hidden></p>
+    <textarea id="text" placeholder="Paste text here, or drop a file anywhere on this box…"></textarea>
+
+    <div class="row" id="chapterRow" hidden>
+      <label for="chapter">Chapter</label>
+      <select id="chapter"></select>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="readBtn" class="primary" disabled>Read aloud</button>
+      <button id="pauseBtn" disabled>Pause</button>
+      <button id="stopBtn" disabled>Stop</button>
+      <span class="spacer"></span>
+      <button id="saveBtn" disabled>Save chapter (.wav)</button>
+      <button id="saveAllBtn" disabled hidden>Save all chapters</button>
+    </div>
+    <div id="status">Loading the voice model…</div>
+    <div id="bar"><div></div></div>
+  </div>
+
+  <div class="panel" id="readerPanel" hidden>
+    <div id="reader"></div>
+    <p class="hint">Click a sentence to start from there. When a chapter ends, it carries on with the next one.</p>
+  </div>
+
+  <div class="panel" id="notesPanel" hidden>
+    <h2>Listening notes</h2>
+    <div class="row tags">
+      <button data-tag="Too long">Too long<kbd>1</kbd></button>
+      <button data-tag="Not clear">Not clear<kbd>2</kbd></button>
+      <button data-tag="Needs research">Needs research<kbd>3</kbd></button>
+      <button data-tag="Sounds off">Sounds off<kbd>4</kbd></button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input id="noteText" placeholder="Own note… (Enter to add)">
+      <button id="noteAdd">Add note</button>
+    </div>
+    <p class="hint">Notes attach to the passage being read right now (or the last one you clicked). Keys 1–4 work while the page is in front.</p>
+    <ul id="notesList"></ul>
+    <div class="row" style="margin-top:12px">
+      <span class="spacer"></span>
+      <button id="notesCopy" disabled>Copy notes</button>
+      <button id="notesSave" disabled>Save notes (.md)</button>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const status = msg => { $("status").textContent = msg; };
+const bar = frac => { $("bar").firstElementChild.style.width = Math.round(frac * 100) + "%"; };
+
+const MAX_SECTION = 15000;   // characters per chapter part (~15 minutes of audio)
+
+let ready = false;
+let ctx = null;
+let runId = 0;
+let doc = null;              // { name, sections: [{title, text}] }
+let docFromPaste = "";       // the pasted text the current doc was built from
+let cur = -1;                // current section index
+let chunks = [];             // sentences of current section: {text, el, audio, key}
+let sampleRate = 24000;
+let busy = false;            // saving in progress
+let nowIdx = 0;              // passage being read / last clicked
+let notes = [];              // [{sec, title, text, tag, note}]
+
+// ---------- Voice worker ----------
+if (location.protocol === "file:") {
+  document.getElementById("status").textContent =
+    "This page was opened as a file, so the voice engine can't start. Double-click “Start TXT Audio Reader.command” instead, or go to http://localhost:8765 while it runs.";
+  throw new Error("Opened via file://");
+}
+const worker = new Worker("voice-worker.js", { type: "module" });
+const pending = new Map();
+let nextId = 1;
+worker.onmessage = e => {
+  const m = e.data;
+  if (m.type === "progress") {
+    bar(m.loaded / m.total);
+    status(`Downloading voice model… ${Math.round(m.loaded / 1e6)} / ${Math.round(m.total / 1e6)} MB (only the first time)`);
+  } else if (m.type === "ready") {
+    ready = true; bar(0);
+    status(`Ready (${m.gpu ? "using the Mac's graphics chip" : "using the processor — Chrome can use the graphics chip and is faster"}).`);
+    refreshButtons();
+  } else if (m.type === "audio") {
+    sampleRate = m.rate;
+    pending.get(m.id)?.resolve(m.audio); pending.delete(m.id);
+  } else if (m.type === "error") {
+    if (m.id && pending.has(m.id)) { pending.get(m.id).reject(new Error(m.message)); pending.delete(m.id); }
+    else status("Couldn't load the voice model: " + m.message);
+  }
+};
+worker.onerror = e => {
+  console.error("TXT Audio Reader worker error", e);
+  status("Voice engine error: " + (e.message ? `${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno || "?"})`
+    : "the voice engine couldn't start. Is the TXT Audio Reader Terminal window still open? If so, reload this page."));
+};
+worker.postMessage({ type: "load" });
+
+// Dutch voices run on Piper (one job at a time, on the page itself)
+let piper = null, piperChain = Promise.resolve();
+const isDutch = v => v.startsWith("nl_");
+function piperGenerate(text, voiceId, run) {
+  const job = piperChain.then(async () => {
+    if (run !== runId) throw new Error("cancelled");
+    piper = piper || await import("https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm");
+    const blob = await piper.predict({ text, voiceId }, p => {
+      if (p.total) { bar(p.loaded / p.total); status(`Downloading Dutch voice… ${Math.round(p.loaded / 1e6)} / ${Math.round(p.total / 1e6)} MB (only the first time)`); }
+    });
+    ctx = ctx || new AudioContext();
+    const ab = await ctx.decodeAudioData(await blob.arrayBuffer());
+    sampleRate = ab.sampleRate;
+    return ab.getChannelData(0).slice();
+  });
+  piperChain = job.catch(() => {});
+  return job;
+}
+
+function generate(text) {
+  if (isDutch($("voice").value)) return piperGenerate(text, $("voice").value, runId);
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    worker.postMessage({ type: "gen", id, run: runId, text, voice: $("voice").value, speed: parseFloat($("speed").value) });
+  });
+}
+
+// ---------- Markdown / Obsidian cleanup ----------
+function cleanMarkdown(src) {
+  let t = src.replace(/\r\n?/g, "\n");
+  t = t.replace(/^---\n[\s\S]*?\n---\n?/, "");
+  t = t.replace(/%%[\s\S]*?%%/g, "");
+  t = t.replace(/<!--[\s\S]*?-->/g, "");
+  t = t.replace(/```[\s\S]*?```/g, "");
+  t = t.replace(/!\[\[[^\]]*\]\]/g, "");
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  t = t.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2");
+  t = t.replace(/\[\[([^\]#|]+)(#[^\]]*)?\]\]/g, "$1");
+  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  t = t.replace(/https?:\/\/\S+/g, "");
+  t = t.replace(/^>\s*\[![^\]]*\][+-]?\s*/gm, "");
+  t = t.replace(/^>\s?/gm, "");
+  t = t.replace(/^#{1,6}\s+(.*?)\s*$/gm, (m, h) => /[.!?…:]$/.test(h) ? h : h + ".");
+  t = t.replace(/^\s*[-*+]\s+\[[ xX]\]\s+/gm, "");
+  t = t.replace(/^\s*[-*+]\s+/gm, "");
+  t = t.replace(/^\s*\d+[.)]\s+/gm, "");
+  t = t.replace(/^\s*\|.*\|\s*$/gm, "");
+  t = t.replace(/^\s*([-*_]\s*){3,}$/gm, "");
+  t = t.replace(/(^|\s)#[\p{L}\p{N}_\/-]+/gu, "$1");
+  t = t.replace(/(\*\*|__|==|~~)(.+?)\1/g, "$2");
+  t = t.replace(/(\*|_)(\S.*?\S|\S)\1/g, "$2");
+  t = t.replace(/`([^`]+)`/g, "$1");
+  t = t.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+}
+
+const plainTitle = h => cleanMarkdown(h).replace(/[.:]$/, "").trim();
+
+// Split markdown into chapters at # and ## headings
+function sectionsFromMarkdown(src) {
+  const body = src.replace(/\r\n?/g, "\n").replace(/^---\n[\s\S]*?\n---\n?/, "");
+  const lines = body.split("\n");
+  const out = []; let title = null, buf = [];
+  const push = () => { const text = cleanMarkdown(buf.join("\n")); if (text) out.push({ title: title || "Start", text }); };
+  let inCode = false;
+  for (const line of lines) {
+    if (/^```/.test(line)) inCode = !inCode;
+    const m = !inCode && line.match(/^#{1,2}\s+(.+)$/);
+    if (m) { push(); title = plainTitle(m[1]); buf = [line]; } else buf.push(line);
+  }
+  push();
+  return out;
+}
+
+// Long chapters are cut into parts at paragraph boundaries
+function capSections(sections) {
+  const out = [];
+  for (const s of sections) {
+    if (s.text.length <= MAX_SECTION) { out.push(s); continue; }
+    const paras = s.text.split(/\n\s*\n/).flatMap(p => {
+      if (p.length <= MAX_SECTION) return [p];
+      const bits = p.match(/[^.!?…]+(?:[.!?…]+|$)/g) || [p], out = []; let b = "";
+      for (const x of bits) { if (b.length + x.length > MAX_SECTION && b) { out.push(b.trim()); b = ""; } b += x; }
+      if (b.trim()) out.push(b.trim());
+      return out;
+    });
+    let part = [], len = 0, n = 1;
+    const flush = () => { if (part.length) { out.push({ title: `${s.title} (part ${n++})`, text: part.join("\n\n") }); part = []; len = 0; } };
+    for (const p of paras) { if (len + p.length > MAX_SECTION) flush(); part.push(p); len += p.length + 2; }
+    flush();
+  }
+  return out;
+}
+
+// ---------- Sentences ----------
+const stripEmoji = t => t.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{FE0F}\u{200D}\u{20E3}]/gu, "").replace(/[ \t]{2,}/g, " ");
+
+function splitText(text) {
+  text = stripEmoji(text);
+  const paras = text.split(/\n\s*\n/).map(p => p.replace(/([^.!?…:;,\s])[ \t]*\n/g, "$1.\n").replace(/\n/g, " ").trim()).filter(Boolean);
+  return paras.map(p => {
+    const sents = p.match(/[^.!?…]+(?:[.!?…]+["'”’)\]]*|$)/g) || [p];
+    const out = [];
+    for (let s of sents.map(x => x.trim()).filter(Boolean)) {
+      while (s.length > 380) {
+        let cut = s.lastIndexOf(",", 380);
+        if (cut < 120) cut = s.lastIndexOf(" ", 380);
+        if (cut < 1) cut = 380;
+        out.push(s.slice(0, cut + 1).trim());
+        s = s.slice(cut + 1).trim();
+      }
+      if (s) out.push(s);
+    }
+    // join short sentences so the voice gets more context and fewer breaks
+    const grouped = [];
+    for (const s of out) {
+      const last = grouped[grouped.length - 1];
+      if (last !== undefined && last.length + s.length < 240) grouped[grouped.length - 1] = last + " " + s;
+      else grouped.push(s);
+    }
+    return grouped;
+  });
+}
+
+// ---------- EPUB ----------
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("couldn't load " + src)); document.head.appendChild(s); });
+}
+
+function textFromHtml(html) {
+  let d = new DOMParser().parseFromString(html, "application/xhtml+xml");
+  if (d.querySelector("parsererror")) d = new DOMParser().parseFromString(html, "text/html");
+  const body = d.body || d.documentElement;
+  body.querySelectorAll("script,style,nav").forEach(n => n.remove());
+  const BLOCK = "p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div,td,dd,dt,figcaption";
+  const blocks = [...body.querySelectorAll(BLOCK)].filter(el => !el.querySelector(BLOCK));
+  const parts = (blocks.length ? blocks : [body]).map(el => el.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const head = body.querySelector("h1,h2,h3");
+  return { title: head ? head.textContent.replace(/\s+/g, " ").trim() : "", text: parts.join("\n\n") };
+}
+
+async function sectionsFromEpub(file) {
+  if (!window.JSZip) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js");
+  const zip = await JSZip.loadAsync(file);
+  const container = await zip.file("META-INF/container.xml").async("text");
+  const opfPath = new DOMParser().parseFromString(container, "application/xml").querySelector("rootfile").getAttribute("full-path");
+  const base = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1) : "";
+  const opf = new DOMParser().parseFromString(await zip.file(opfPath).async("text"), "application/xml");
+  const manifest = {};
+  opf.querySelectorAll("manifest > item").forEach(it => { manifest[it.getAttribute("id")] = it.getAttribute("href"); });
+  const out = [];
+  let n = 1;
+  for (const ref of opf.querySelectorAll("spine > itemref")) {
+    const href = manifest[ref.getAttribute("idref")];
+    if (!href) continue;
+    const entry = zip.file(base + decodeURIComponent(href.split("#")[0]));
+    if (!entry) continue;
+    const { title, text } = textFromHtml(await entry.async("text"));
+    if (text.length < 40) continue;            // skip covers / empty pages
+    out.push({ title: title || `Section ${n}`, text });
+    n++;
+  }
+  return out;
+}
+
+// ---------- PDF ----------
+async function sectionsFromPdf(file) {
+  const pdfjs = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    status(`Reading PDF page ${i} of ${pdf.numPages}…`); bar(i / pdf.numPages);
+    const tc = await (await pdf.getPage(i)).getTextContent();
+    let t = tc.items.map(it => it.str + (it.hasEOL ? "\n" : "")).join("");
+    t = t.replace(/(\w)-\n(\w)/g, "$1$2")                 // re-join hyphenated words
+         .replace(/\n{2,}/g, "\u0000").replace(/\n/g, " ").replace(/\u0000/g, "\n\n")
+         .replace(/[ \t]+/g, " ").trim();
+    pages.push(t);
+  }
+  const out = [];
+  const PER = 10;
+  for (let i = 0; i < pages.length; i += PER) {
+    const text = pages.slice(i, i + PER).filter(Boolean).join("\n\n");
+    if (text) out.push({ title: `Pages ${i + 1}–${Math.min(i + PER, pages.length)}`, text });
+  }
+  return out;
+}
+
+// ---------- Document handling ----------
+function setDoc(name, sections, fromPaste = "") {
+  stop(true);
+  doc = { name, sections: capSections(sections) };
+  docFromPaste = fromPaste;
+  const sel = $("chapter"); sel.innerHTML = "";
+  doc.sections.forEach((s, i) => { const o = document.createElement("option"); o.value = i; o.textContent = `${i + 1}. ${s.title}`; sel.appendChild(o); });
+  const multi = doc.sections.length > 1;
+  $("chapterRow").hidden = !multi;
+  $("saveAllBtn").hidden = !multi;
+  if (!fromPaste) {
+    const words = doc.sections.reduce((n, s) => n + s.text.split(/\s+/).length, 0);
+    $("docInfo").innerHTML = "";
+    $("docInfo").append("Loaded ", Object.assign(document.createElement("b"), { textContent: name }),
+      ` — ${doc.sections.length} chapter${multi ? "s" : ""}, about ${words.toLocaleString()} words.`);
+    $("docInfo").hidden = false;
+    $("text").value = ""; $("text").placeholder = "Or paste other text here to read that instead…";
+  }
+  notes = loadNotes();
+  selectSection(0);
+  renderNotes();
+  refreshButtons();
+}
+
+function selectSection(i) {
+  cur = i; $("chapter").value = i;
+  const reader = $("reader"); reader.innerHTML = ""; chunks = [];
+  for (const para of splitText(doc.sections[i].text)) {
+    const p = document.createElement("p");
+    for (const s of para) {
+      const span = document.createElement("span");
+      span.textContent = s + " ";
+      const idx = chunks.length;
+      span.onclick = () => start(idx);
+      p.appendChild(span);
+      chunks.push({ text: s, el: span, audio: null, key: "" });
+    }
+    reader.appendChild(p);
+  }
+  reader.scrollTop = 0;
+  $("readerPanel").hidden = chunks.length === 0;
+  $("notesPanel").hidden = chunks.length === 0;
+  nowIdx = 0;
+  paintMarks();
+}
+
+function ensureDocFromPaste() {
+  const raw = $("text").value;
+  if (raw.trim() && raw !== docFromPaste) setDoc("Pasted text", sectionsFromMarkdown(raw), raw);
+  return !!doc;
+}
+
+function refreshButtons() {
+  const has = ready && (!!doc || !!$("text").value.trim());
+  $("readBtn").disabled = !has || busy;
+  $("saveBtn").disabled = !has || busy;
+  $("saveAllBtn").disabled = !has || busy;
+}
+
+async function loadFile(f) {
+  if (!f) return;
+  const ext = f.name.split(".").pop().toLowerCase();
+  const name = f.name.replace(/\.[^.]+$/, "");
+  status(`Opening “${f.name}”…`);
+  try {
+    let sections;
+    if (ext === "epub") sections = await sectionsFromEpub(f);
+    else if (ext === "pdf") sections = await sectionsFromPdf(f);
+    else sections = sectionsFromMarkdown(await f.text());
+    if (!sections.length) { status("Couldn't find any readable text in that file."); return; }
+    setDoc(name, sections);
+    bar(0);
+    const nl = looksDutch(sections);
+    useLanguage(nl);
+    status(nl ? `“${f.name}” looks Dutch, so I switched to a Dutch voice. Ready to read.`
+              : `Ready to read “${f.name}”.`);
+  } catch (e) { console.error(e); status(`Couldn't open “${f.name}”: ${e.message}`); }
+}
+
+// ---------- Playback ----------
+const settingsKey = () => $("voice").value + "@" + $("speed").value;
+
+async function synth(i) {
+  const c = chunks[i], key = settingsKey();
+  if (c.audio && c.key === key) return c.audio;
+  const a = await generate(c.text);
+  c.audio = a; c.key = key; c.rate = sampleRate;
+  return a;
+}
+
+// Audio is scheduled back to back on the audio clock; events fire against that clock,
+// so pausing (which freezes the clock) pauses the highlighting too.
+let sources = [], events = [];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+setInterval(() => {
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  events = events.filter(ev => { if (ev.at <= now) { ev.fn(); return false; } return true; });
+}, 80);
+
+function schedule(samples, at, rate = sampleRate) {
+  const buf = ctx.createBuffer(1, samples.length, rate);
+  buf.copyToChannel(samples, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.connect(ctx.destination);
+  src.start(at);
+  sources.push(src);
+  src.onended = () => { sources = sources.filter(x => x !== src); };
+}
+
+const LOOKAHEAD = 5;      // pieces prepared ahead of what is playing
+const BREATH = 0.18;      // seconds between pieces
+
+async function start(from = 0) {
+  if (!ready || busy || !ensureDocFromPaste() || !chunks.length) return;
+  ctx = ctx || new AudioContext();
+  if (ctx.state === "suspended") await ctx.resume();
+  stop(true);
+  const myRun = runId;
+  nowIdx = from;
+  $("pauseBtn").disabled = false; $("stopBtn").disabled = false; $("pauseBtn").textContent = "Pause";
+  chunks.forEach((c, k) => { c.el.classList.remove("now"); c.el.classList.toggle("done", k < from); });
+  const total = doc.sections.length > 1 ? ` · chapter ${cur + 1} of ${doc.sections.length}` : "";
+
+  const jobs = [];
+  const want = i => { if (i < chunks.length && !jobs[i]) { jobs[i] = synth(i); jobs[i].catch(() => {}); } };
+  for (let k = from; k < from + LOOKAHEAD; k++) want(k);
+
+  let t = 0;
+  for (let i = from; i < chunks.length; i++) {
+    if (i === from) status("Preparing…");
+    let samples;
+    try { samples = await jobs[i]; } catch (e) { if (myRun === runId) status("Voice error: " + e.message); return; }
+    if (myRun !== runId) return;
+    want(i + LOOKAHEAD);
+    const at = Math.max(ctx.currentTime + 0.05, t);
+    const rate = chunks[i].rate || sampleRate;
+    const dur = samples.length / rate;
+    schedule(samples, at, rate);
+    t = at + dur + BREATH;
+    const c = chunks[i], n = i;
+    events.push({ at, fn: () => {
+      if (myRun !== runId) return;
+      chunks.forEach(x => x.el.classList.remove("now"));
+      c.el.classList.add("now"); nowIdx = n;
+      c.el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      status(`Reading ${n + 1} of ${chunks.length}${total}`);
+      bar(n / chunks.length);
+    } });
+    events.push({ at: at + dur, fn: () => { if (myRun === runId) { c.el.classList.remove("now"); c.el.classList.add("done"); } } });
+    // don't queue more than ~30 seconds of audio ahead
+    while (myRun === runId && t - ctx.currentTime > 30) await sleep(250);
+  }
+  while (myRun === runId && ctx.currentTime < t) await sleep(150);
+  if (myRun !== runId) return;
+  if (cur + 1 < doc.sections.length) { selectSection(cur + 1); return start(0); }
+  bar(1); status("Finished.");
+  $("pauseBtn").disabled = true; $("stopBtn").disabled = true;
+}
+
+function stop(silent = false) {
+  runId++;
+  worker.postMessage({ type: "cancel", run: runId });
+  sources.forEach(src => { try { src.stop(); } catch {} });
+  sources = []; events = [];
+  if (ctx && ctx.state === "suspended") ctx.resume();
+  chunks.forEach(c => c.el.classList.remove("now"));
+  $("pauseBtn").disabled = true; $("stopBtn").disabled = true; $("pauseBtn").textContent = "Pause";
+  if (!silent) { bar(0); status("Stopped."); }
+}
+
+async function togglePause() {
+  if (!ctx) return;
+  if (ctx.state === "running") { await ctx.suspend(); $("pauseBtn").textContent = "Resume"; status("Paused."); }
+  else { await ctx.resume(); $("pauseBtn").textContent = "Pause"; status("Reading…"); }
+}
+
+// ---------- Saving ----------
+function encodeWav(parts, rate) {
+  const n = parts.reduce((s, p) => s + p.length, 0);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((ch, k) => v.setUint8(o + k, ch.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE");
+  w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, "data"); v.setUint32(40, n * 2, true);
+  let off = 44;
+  for (const p of parts) for (let i = 0; i < p.length; i++, off += 2) {
+    const s = Math.max(-1, Math.min(1, p[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
+const safe = s => s.replace(/[\/\\:*?"<>|]+/g, "-").slice(0, 80).trim();
+
+async function saveSection(i, label) {
+  const parts = [];
+  for (let k = 0; k < chunks.length; k++) {
+    status(`${label} — preparing sentence ${k + 1} of ${chunks.length}`);
+    bar(k / chunks.length);
+    parts.push(await synth(k));
+    parts.push(new Float32Array(Math.round(sampleRate * 0.25)));
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(encodeWav(parts, sampleRate));
+  const num = doc.sections.length > 1 ? ` - ${String(i + 1).padStart(2, "0")} ${safe(doc.sections[i].title)}` : "";
+  a.download = `${safe(doc.name)}${num} - ${$("voice").value}.wav`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+async function saveOne() {
+  if (!ensureDocFromPaste()) return;
+  stop(true); busy = true; refreshButtons();
+  try { await saveSection(cur, "Saving"); bar(1); status("Saved to your Downloads folder."); }
+  catch (e) { status("Couldn't save: " + e.message); }
+  busy = false; refreshButtons();
+}
+
+async function saveAll() {
+  if (!ensureDocFromPaste()) return;
+  stop(true); busy = true; refreshButtons();
+  const n = doc.sections.length;
+  try {
+    for (let i = 0; i < n; i++) {
+      selectSection(i);
+      await saveSection(i, `Saving chapter ${i + 1} of ${n}`);
+    }
+    bar(1); status(`Saved ${n} files to your Downloads folder.`);
+  } catch (e) { status("Couldn't save: " + e.message); }
+  busy = false; refreshButtons();
+}
+
+// ---------- Listening notes ----------
+const notesKey = () => "txt-audio-reader-notes:" + (doc ? doc.name : "");
+function loadNotes() { try { return JSON.parse(localStorage.getItem(notesKey()) || "[]"); } catch { return []; } }
+function storeNotes() { try { localStorage.setItem(notesKey(), JSON.stringify(notes)); } catch {} }
+
+function addNote(tag, note = "") {
+  if (!doc || !chunks.length) return;
+  const c = chunks[Math.min(nowIdx, chunks.length - 1)];
+  notes.push({ sec: cur, title: doc.sections[cur].title, text: c.text, tag, note });
+  storeNotes(); renderNotes(); paintMarks();
+  status(`Noted: ${tag}${note ? " — " + note : ""}`);
+}
+
+function paintMarks() {
+  const here = new Set(notes.filter(n => n.sec === cur).map(n => n.text));
+  chunks.forEach(c => c.el.classList.toggle("marked", here.has(c.text)));
+}
+
+function renderNotes() {
+  const ul = $("notesList"); ul.innerHTML = "";
+  notes.forEach((n, i) => {
+    const li = document.createElement("li");
+    const tag = Object.assign(document.createElement("span"), { className: "tag", textContent: n.tag });
+    const what = Object.assign(document.createElement("span"), { className: "what" });
+    what.append(`${n.sec + 1}. ${n.title} — “${n.text.length > 110 ? n.text.slice(0, 110) + "…" : n.text}”`);
+    if (n.note && n.note !== n.tag) what.append(" ", Object.assign(document.createElement("i"), { textContent: n.note }));
+    what.title = "Listen from here";
+    what.onclick = () => {
+      stop(true);
+      if (cur !== n.sec) selectSection(n.sec);
+      const k = chunks.findIndex(c => c.text === n.text);
+      start(Math.max(0, k));
+    };
+    const x = Object.assign(document.createElement("button"), { className: "x", textContent: "×", title: "Remove" });
+    x.onclick = () => { notes.splice(i, 1); storeNotes(); renderNotes(); paintMarks(); };
+    li.append(tag, what, x); ul.appendChild(li);
+  });
+  $("notesCopy").disabled = $("notesSave").disabled = notes.length === 0;
+}
+
+function notesMarkdown() {
+  const lines = [`# Listening notes — ${doc.name}`, "", `${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} · voice: ${$("voice").selectedOptions[0].textContent}`, ""];
+  let last = null;
+  [...notes].sort((a, b) => a.sec - b.sec).forEach(n => {
+    if (n.sec !== last) { lines.push(`## ${n.title}`, ""); last = n.sec; }
+    lines.push(`- **${n.tag}** — “${n.text}”${n.note && n.note !== n.tag ? `\n  - ${n.note}` : ""}`);
+  });
+  return lines.join("\n") + "\n";
+}
+
+$("notesPanel").querySelectorAll("[data-tag]").forEach(b => b.onclick = () => addNote(b.dataset.tag));
+$("noteAdd").onclick = () => { const v = $("noteText").value.trim(); if (v) { addNote("Note", v); $("noteText").value = ""; } };
+$("noteText").addEventListener("keydown", e => { if (e.key === "Enter") $("noteAdd").click(); });
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const b = $("notesPanel").querySelector(`.tags button:nth-child(${e.key})`);
+  if (b && /^[1-4]$/.test(e.key) && !$("notesPanel").hidden) { e.preventDefault(); b.click(); }
+});
+$("notesCopy").onclick = async () => { try { await navigator.clipboard.writeText(notesMarkdown()); status("Notes copied — paste them into Obsidian."); } catch { status("Couldn't copy; use Save notes instead."); } };
+$("notesSave").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([notesMarkdown()], { type: "text/markdown" }));
+  a.download = `${safe(doc.name)} - listening notes.md`;
+  a.click();
+  status("Notes saved to your Downloads folder.");
+};
+
+// ---------- Remembered settings ----------
+let settings = {};
+try { settings = JSON.parse(localStorage.getItem("txt-audio-reader-settings") || "{}"); } catch {}
+const hasVoice = v => v && [...$("voice").options].some(o => o.value === v);
+if (hasVoice(settings.voice) && !isDutch(settings.voice)) $("voice").value = settings.voice;
+if (settings.speed) { $("speed").value = settings.speed; $("speedVal").textContent = parseFloat(settings.speed).toFixed(2) + "×"; }
+function useLanguage(dutch) {
+  const want = dutch ? (hasVoice(settings.voiceNl) ? settings.voiceNl : "nl_NL-mls-medium")
+                     : (hasVoice(settings.voice) && !isDutch(settings.voice) ? settings.voice : "bf_lily");
+  if (isDutch($("voice").value) !== dutch) $("voice").value = want;
+}
+const rememberSettings = () => {
+  const v = $("voice").value;
+  if (isDutch(v)) settings.voiceNl = v; else settings.voice = v;
+  settings.speed = $("speed").value;
+  try { localStorage.setItem("txt-audio-reader-settings", JSON.stringify(settings)); } catch {}
+};
+$("voice").addEventListener("change", rememberSettings);
+$("speed").addEventListener("change", rememberSettings);
+
+// ---------- Language check ----------
+function looksDutch(sections) {
+  const sample = " " + sections.map(s => s.text).join(" ").slice(0, 20000).toLowerCase() + " ";
+  const count = words => words.reduce((n, w) => n + (sample.split(` ${w} `).length - 1), 0);
+  const nl = count(["de", "het", "een", "niet", "ik", "je", "van", "dat", "zijn", "voor", "met", "ook", "wordt"]);
+  const en = count(["the", "and", "of", "to", "is", "that", "it", "with", "for", "you", "this", "are", "was"]);
+  return nl > 20 && nl > en * 1.5;
+}
+
+// ---------- Wiring ----------
+$("openBtn").onclick = () => $("file").click();
+$("file").onchange = e => { loadFile(e.target.files[0]); e.target.value = ""; };
+const zone = $("dropZone");
+zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drop"); });
+zone.addEventListener("dragleave", () => zone.classList.remove("drop"));
+zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("drop"); loadFile(e.dataTransfer.files[0]); });
+$("text").addEventListener("input", refreshButtons);
+$("chapter").onchange = e => { stop(true); selectSection(+e.target.value); status("Ready."); };
+$("readBtn").onclick = () => start(0);
+$("stopBtn").onclick = () => stop();
+$("pauseBtn").onclick = togglePause;
+$("saveBtn").onclick = saveOne;
+$("saveAllBtn").onclick = saveAll;
+$("speed").oninput = e => { $("speedVal").textContent = parseFloat(e.target.value).toFixed(2) + "×"; };
+</script>
+</body>
+</html>
