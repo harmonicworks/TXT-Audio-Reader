@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TXT Audio Reader</title>
+<title>TXT Audio Reader: private text-to-speech in your browser</title>
+<meta name="description" content="Free, private text-to-speech reader that runs in your browser: open a text, Markdown, EPUB or PDF file and hear it read aloud with natural British English or Dutch voices, or save it as WAV. Your documents never leave your computer.">
+<link rel="canonical" href="https://harmonicworks.org/TXT-Audio-Reader/">
+<meta property="og:title" content="TXT Audio Reader: private text-to-speech in your browser">
+<meta property="og:description" content="Free, private text-to-speech reader that runs in your browser: open a text, Markdown, EPUB or PDF file and hear it read aloud with natural British English or Dutch voices, or save it as WAV. Your documents never leave your computer.">
+<meta property="og:url" content="https://harmonicworks.org/TXT-Audio-Reader/">
+<meta property="og:type" content="website">
 <style>
   :root {
     --bg: #f6f3ee; --panel: #fffdf9; --ink: #2a2622; --muted: #7a716a;
@@ -65,7 +71,8 @@
 <body>
 <main>
   <h1>TXT Audio <span>Reader</span></h1>
-  <p class="sub">Paste text, or open / drop a .md, .txt, .epub or .pdf file. Everything runs on this Mac.</p>
+  <p class="sub">Paste text, or open / drop a .md, .txt, .epub or .pdf file. Everything runs in your browser: your text never leaves your computer.</p>
+  <p class="sub"><strong>First time?</strong> The first time you use a voice, its voice model is downloaded once (roughly 80–300 MB for the English voices, about 60 MB per Dutch voice). After that it's kept in your browser's cache, so it starts quickly.</p>
 
   <div class="panel">
     <div class="row">
@@ -165,7 +172,7 @@ let notes = [];              // [{sec, title, text, tag, note}]
 // ---------- Voice worker ----------
 if (location.protocol === "file:") {
   document.getElementById("status").textContent =
-    "This page was opened as a file, so the voice engine can't start. Double-click “Start TXT Audio Reader.command” instead, or go to http://localhost:8765 while it runs.";
+    "This page was opened as a file, so the voice engine can't start. Open it online instead: https://harmonicworks.org/TXT-Audio-Reader/";
   throw new Error("Opened via file://");
 }
 const worker = new Worker("voice-worker.js", { type: "module" });

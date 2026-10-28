@@ -17,21 +17,11 @@ It was built as a personal tool for listening back to my own writing. Hearing yo
 
 ## How to use it
 
-You need a computer with Python 3 (included with, or easily installed on, macOS and Linux) and a modern browser. Chrome or Edge is fastest, because they can use your graphics chip. Firefox and Safari work, but more slowly.
+**[Open TXT Audio Reader in your browser](https://harmonicworks.org/TXT-Audio-Reader/)**: nothing to install.
 
-**On a Mac:** double-click `Start TXT Audio Reader.command` (or the Chrome version). The first time, macOS may block it: right-click → Open → Open. A Terminal window opens and the reader appears in your browser. Keep that window open while you use it; close it to stop.
+Chrome or Edge is fastest, because they can use your graphics chip. Firefox and Safari work, but more slowly.
 
-**Anywhere else:** in this folder, run
-
-```
-python3 -m http.server 8765 --bind 127.0.0.1
-```
-
-and open `http://localhost:8765` in your browser.
-
-The page must be opened through `localhost`, not by double-clicking `index.html`, because browsers don't allow the voice engine to start from a plain file.
-
-The first time you use each engine, the voice model is downloaded (roughly 80–300 MB for Kokoro, about 60 MB per Dutch voice). After that it's cached by your browser.
+**The first time you use a voice, its voice model is downloaded** (roughly 80–300 MB for the English voices via Kokoro, about 60 MB per Dutch voice). That's a one-time wait: after that it's cached by your browser and starts quickly. Clearing your browser's cache means downloading it again.
 
 ## Privacy
 
