@@ -25,7 +25,7 @@ Chrome or Edge is fastest, because they can use your graphics chip. Firefox and 
 
 ## Privacy
 
-Your documents never leave your computer. All text processing and speech generation happens locally in your browser. Nothing is uploaded, and there are no accounts, analytics or tracking.
+Your documents never leave your computer. All text processing and speech generation happens locally in your browser. Nothing is uploaded, and there are no accounts, no cookies and no tracking. The site counts anonymous visits with Cloudflare Web Analytics (no cookies, no personal data); that never includes your text.
 
 The page does load its libraries and voice models from public sources (jsDelivr, cdnjs and Hugging Face), the first time and whenever your browser's cache is cleared. Those services can see that a download happened, but not what you're reading.
 
